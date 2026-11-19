@@ -43,14 +43,14 @@ function update(){
  bar.setAttribute('aria-label',parts.map(p=>p[0]+' '+euro(p[1])).join(', '));
  byId('chartNote').textContent=r.price*r.sales===0?'Enter a price and number of sales to visualize your costs.':r.net<0?'Costs exceed revenue: bars are scaled to positive amounts, and negative contribution appears in the legend.':'Contribution is before one-time startup costs and taxes.';
 }
-function exportGraphic(){
+async function exportGraphic(){
  const status=byId('imageStatus'),r=data();
  try{
   const c=document.createElement('canvas');c.width=1080;c.height=1350;
   const ctx=c.getContext('2d');if(!ctx)throw Error('Canvas unsupported');
   const bg=ctx.createLinearGradient(0,0,1080,1350);bg.addColorStop(0,'#102b2b');bg.addColorStop(.56,'#0b1726');bg.addColorStop(1,'#090e19');ctx.fillStyle=bg;ctx.fillRect(0,0,1080,1350);
   function text(t,x,y,font,color='#f4f8ff'){ctx.font=font;ctx.fillStyle=color;ctx.fillText(t,x,y)}
-  function rect(x,y,w,h,radius,color){ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,radius);ctx.fill()}
+  function rect(x,y,w,h,radius,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h)}
   rect(64,62,68,68,18,'#68e6b3');text('↗',82,110,'bold 46px Arial','#08251d');text('ProfitPilot',152,111,'bold 45px Arial');
   text('REVENUE IS NOT PROFIT',66,225,'bold 24px Arial','#68e6b3');text('Know your numbers.',66,305,'bold 65px Arial');
   rect(64,354,952,260,28,'#163a34');text('PROFIT PER SALE · BEFORE TAX',98,423,'bold 25px Arial','#b6e7d4');
@@ -58,9 +58,20 @@ function exportGraphic(){
   const rows=[['Selling price',euro(r.price)],['Variable cost per sale',euro(r.cost)],['Expected sales',String(r.sales)],['Total profit after startup',euro(r.total)],['Break-even sales',r.breakeven===null?'Not achievable':String(r.breakeven)]];
   let y=683;for(const [label,value] of rows){text(label,76,y,'28px Arial','#a8bbcf');ctx.textAlign='right';text(value,1004,y,'bold 29px Arial');ctx.textAlign='left';y+=103;ctx.fillStyle='#2a3a4b';ctx.fillRect(76,y-70,928,2)}
   rect(64,1161,952,115,18,'#162736');text('ILLUSTRATIVE CALCULATION · NOT A GUARANTEE',89,1207,'bold 21px Arial','#e4ebf2');text('ProfitPilot · Free profit calculator',89,1245,'23px Arial','#95aabe');
-  const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download='profitpilot-breakdown.png';document.body.append(a);a.click();a.remove();
-  status.textContent='Image generated. Check your downloads.';
- }catch(e){status.textContent='Image export is unsupported in this browser.';console.error(e)}
+  const blob=await new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error('PNG encoding failed')),'image/png'));
+  const file=new File([blob],'profitpilot-breakdown.png',{type:'image/png'});
+  // On mobile, the native share sheet is more reliable than a synthetic download.
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+   try{await navigator.share({files:[file],title:'ProfitPilot breakdown'});status.textContent='Image shared or saved using your device.';return}
+   catch(e){if(e.name==='AbortError'){status.textContent='Share cancelled.';return}}
+  }
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='profitpilot-breakdown.png';a.style.display='none';document.body.append(a);a.click();a.remove();
+  status.textContent='PNG prepared. Check downloads; if your browser blocked it, use Open image.';
+  const existing=byId('openExportImage');if(existing)existing.remove();
+  const open=document.createElement('a');open.id='openExportImage';open.href=url;open.target='_blank';open.rel='noopener';open.textContent='Open image';open.className='secondary';open.style.textDecoration='none';open.style.display='inline-block';open.style.marginTop='8px';status.after(open);
+  setTimeout(()=>{URL.revokeObjectURL(url);open.remove()},120000);
+ }catch(e){status.textContent='Could not create the image: '+(e.message||'unknown error');console.error(e)}
 }
 keys.forEach(id=>byId(id).addEventListener('input',update));
 document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',update));

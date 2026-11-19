@@ -38,6 +38,8 @@ function data(){
  return {price,unit,percentage,fixedFee,ads,other,startup,sales,cost,net,total:net*sales-startup,breakeven:net>0?Math.ceil(startup/net):null};
 }
 function update(){
+ const invalid=keys.some(id=>byId(id).value.trim()===''||!Number.isFinite(Number(byId(id).value))||Number(byId(id).value)<0)||Number(byId('fee').value)>100||!Number.isInteger(Number(byId('sales').value));
+ if(invalid){byId('costStack').replaceChildren();byId('costLegend').replaceChildren();byId('costStack').setAttribute('aria-label','Chart unavailable due to invalid inputs');byId('chartNote').textContent='Correct the inputs to display a reliable breakdown.';return;}
  const r=data(),parts=[
   ['Product / delivery',r.unit*r.sales,'#7a9cea'],
   ['Platform fees',(r.price*r.percentage/100+r.fixedFee)*r.sales,'#b49cfa'],
